@@ -25,7 +25,8 @@
 
 ## Screenshots
 
-*(Optional: Add screenshots of the Burp Suite tab here)*
+<img width="1918" height="771" alt="image" src="https://github.com/user-attachments/assets/398540e1-592b-453b-9c12-587bebe5e3c3" />
+
 
 ---
 
