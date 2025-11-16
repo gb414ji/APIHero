@@ -22,7 +22,7 @@
 - Minimalist, lightweight UI for fast performance.
 
 - **Version 1.1** have clear selection feature!!!
-
+- **Version 1.2** have export UNIQUE URL's/URIs feature!!
 ---
 
 ## Screenshots
