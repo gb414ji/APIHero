@@ -1,5 +1,5 @@
 # -*- coding: ascii -*-
-# apihero.py - APIHero CSV Export Only (Jython 2.7 compatible)
+# apihero.py - APIHero CSV Export Only (Jython 2.7 compatible) with Unique Endpoint Export
 
 from burp import IBurpExtender, ITab
 from javax.swing import JPanel, JScrollPane, JSplitPane, JButton, JTextArea, JFileChooser, JOptionPane
@@ -14,7 +14,6 @@ import os, re, traceback
 ID_RE = re.compile("(^|/)([0-9a-fA-F]{8,}|[0-9]+)(?=$|/)")
 
 def normalize_path_for_placeholders(url):
-    """Replace numeric/UUID path segments with {id}."""
     if url is None:
         return ""
     try:
@@ -35,7 +34,6 @@ def normalize_path_for_placeholders(url):
 
 # ------------------------- File chooser -------------------------
 def choose_file(default_name):
-    """Open JFileChooser or fallback to home directory."""
     try:
         fc = JFileChooser()
         fc.setSelectedFile(File(default_name))
@@ -82,13 +80,11 @@ class BurpExtender(IBurpExtender, ITab):
         Thread(TreeBuilder(self)).start()
         self._log("apihero loaded. Site map indexing running in background.")
 
-    # ---------------- ITab ----------------
     def getTabCaption(self):
         return "APIHero"
     def getUiComponent(self):
         return self.panel
 
-    # ---------------- Logging ----------------
     def _log(self, s):
         try:
             if self.stdout:
@@ -106,7 +102,6 @@ class BurpExtender(IBurpExtender, ITab):
         except:
             pass
 
-    # ---------------- UI Build ----------------
     def _build_ui(self):
         root = DefaultMutableTreeNode("Site Map (loading...)")
         self.tree_model = DefaultTreeModel(root)
@@ -121,10 +116,10 @@ class BurpExtender(IBurpExtender, ITab):
         self.btnLoad = JButton("Load Selected", actionPerformed=self._on_load_selected)
         self.btnClear = JButton("Clear Selection", actionPerformed=self._on_clear_selection)
         self.btnCSV = JButton("Export CSV", actionPerformed=self._on_export_csv)
+        self.btnUniqueCSV = JButton("Export Unique CSV", actionPerformed=self._on_export_unique_csv)
         self.btnHelp = JButton("Help", actionPerformed=self._on_help)
-        top.add(self.btnLoad); top.add(self.btnClear); top.add(self.btnCSV); top.add(self.btnHelp)
+        top.add(self.btnLoad); top.add(self.btnClear); top.add(self.btnCSV); top.add(self.btnUniqueCSV); top.add(self.btnHelp)
 
-        # Text preview
         self.preview = JTextArea()
         self.preview.setEditable(False)
         self.preview.setLineWrap(True)
@@ -137,7 +132,6 @@ class BurpExtender(IBurpExtender, ITab):
         self.panel.add(top, BorderLayout.NORTH)
         self.panel.add(split, BorderLayout.CENTER)
 
-    # ---------------- Tree / Node Helpers ----------------
     def _ensure_expanded(self):
         try:
             for i in range(self.tree.getRowCount()):
@@ -173,7 +167,6 @@ class BurpExtender(IBurpExtender, ITab):
                             collected.append(e)
         return collected
 
-    # ---------------- Tree Build ----------------
     def _build_tree_from_sitemap(self):
         try:
             entries = self._callbacks.getSiteMap(None)
@@ -236,7 +229,6 @@ class BurpExtender(IBurpExtender, ITab):
         except Exception as e:
             self._err("apply model failed: " + str(e))
 
-    # ---------------- UI Actions ----------------
     def _on_help(self, evt):
         help_text = (
             "APIHero - Quick Guide\n\n"
@@ -244,7 +236,7 @@ class BurpExtender(IBurpExtender, ITab):
             "2) Click 'Load Selected' to preview extracted endpoints.\n"
             "3) Click 'Clear Selection' to deselect all items and clear preview.\n"
             "4) Click 'Export CSV' to save grouped Method+URL CSV.\n"
-            "   - Numeric/UUID path segments replaced with {id} placeholders."
+            "5) Click 'Export Unique CSV' to save only unique normalized endpoints."
         )
         JOptionPane.showMessageDialog(None, help_text)
 
@@ -286,7 +278,7 @@ class BurpExtender(IBurpExtender, ITab):
         self.preview.setText(preview_text)
 
     # ---------------- CSV Export ----------------
-    def _on_export_csv(self, evt):
+    def _on_export_csv(self, evt, unique=False):
         entries = [e for e in self._collect_entries_for_selected() if getattr(e,'getRequest',None) is not None]
         if not entries:
             JOptionPane.showMessageDialog(None,"No endpoints with requests to export.")
@@ -296,6 +288,7 @@ class BurpExtender(IBurpExtender, ITab):
         if not path: return
 
         grouped = {}
+        seen_eps = set()
         for entry in entries:
             try:
                 req = entry.getRequest()
@@ -310,6 +303,9 @@ class BurpExtender(IBurpExtender, ITab):
                     continue
             host = url.split("/",3)[2] if "://" in url else "unknown_host"
             normalized = normalize_path_for_placeholders(url)
+            if unique and (method, normalized) in seen_eps:
+                continue
+            seen_eps.add((method, normalized))
             segs = [s for s in normalized.split("/") if s]
             top_folder = segs[0] if segs else "/"
             grouped.setdefault(host, {}).setdefault(top_folder, []).append((method, normalized))
@@ -326,7 +322,9 @@ class BurpExtender(IBurpExtender, ITab):
             self._err("CSV export failed:\n" + traceback.format_exc())
             JOptionPane.showMessageDialog(None,"CSV export failed: see stderr.")
 
-    # ---------------- Clear Selection ----------------
+    def _on_export_unique_csv(self, evt):
+        self._on_export_csv(evt, unique=True)
+
     def _on_clear_selection(self, evt):
         try:
             self.tree.clearSelection()
