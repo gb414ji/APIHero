@@ -10,9 +10,7 @@ from java.lang import Thread, Runnable
 from java.io import File
 import os, re, traceback
 
-# -------------------------
-# Helpers / Config
-# -------------------------
+# ------------------------- Helpers / Config -------------------------
 ID_RE = re.compile("(^|/)([0-9a-fA-F]{8,}|[0-9]+)(?=$|/)")
 
 def normalize_path_for_placeholders(url):
@@ -35,9 +33,7 @@ def normalize_path_for_placeholders(url):
         path = path[:-1]
     return path
 
-# -------------------------
-# File chooser
-# -------------------------
+# ------------------------- File chooser -------------------------
 def choose_file(default_name):
     """Open JFileChooser or fallback to home directory."""
     try:
@@ -51,9 +47,7 @@ def choose_file(default_name):
     home = os.path.expanduser("~")
     return os.path.join(home, default_name)
 
-# -------------------------
-# Tree builder Runnable
-# -------------------------
+# ------------------------- Tree builder Runnable -------------------------
 class TreeBuilder(Runnable):
     def __init__(self, ext):
         self.ext = ext
@@ -66,13 +60,10 @@ class TreeBuilder(Runnable):
             except:
                 pass
 
-# -------------------------
-# Main BurpExtender Class
-# -------------------------
+# ------------------------- Main BurpExtender Class -------------------------
 class BurpExtender(IBurpExtender, ITab):
 
     def registerExtenderCallbacks(self, callbacks):
-        # ---------------- Init ----------------
         self._callbacks = callbacks
         self._helpers = callbacks.getHelpers()
         self._callbacks.setExtensionName("apihero")
@@ -85,7 +76,7 @@ class BurpExtender(IBurpExtender, ITab):
         self.node_map = {}
         self.tree_model = None
 
-        # ---------------- UI ----------------
+        # Build UI
         self._build_ui()
         callbacks.addSuiteTab(self)
         Thread(TreeBuilder(self)).start()
@@ -124,16 +115,21 @@ class BurpExtender(IBurpExtender, ITab):
         self.tree.setRootVisible(True)
         self.tree.setShowsRootHandles(True)
 
+        # Top panel with buttons
         self.panel = JPanel(BorderLayout())
         top = JPanel()
         self.btnLoad = JButton("Load Selected", actionPerformed=self._on_load_selected)
+        self.btnClear = JButton("Clear Selection", actionPerformed=self._on_clear_selection)
         self.btnCSV = JButton("Export CSV", actionPerformed=self._on_export_csv)
         self.btnHelp = JButton("Help", actionPerformed=self._on_help)
-        top.add(self.btnLoad); top.add(self.btnCSV); top.add(self.btnHelp)
+        top.add(self.btnLoad); top.add(self.btnClear); top.add(self.btnCSV); top.add(self.btnHelp)
 
+        # Text preview
         self.preview = JTextArea()
         self.preview.setEditable(False)
-        self.preview.setPreferredSize(Dimension(500,400))
+        self.preview.setLineWrap(True)
+        self.preview.setWrapStyleWord(True)
+        self.preview.setPreferredSize(Dimension(500, 400))
 
         split = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, JScrollPane(self.tree), JScrollPane(self.preview))
         split.setDividerLocation(350)
@@ -246,7 +242,8 @@ class BurpExtender(IBurpExtender, ITab):
             "APIHero - Quick Guide\n\n"
             "1) CTRL+Click to multi-select folders or endpoints.\n"
             "2) Click 'Load Selected' to preview extracted endpoints.\n"
-            "3) Click 'Export CSV' to save grouped Method+URL CSV.\n"
+            "3) Click 'Clear Selection' to deselect all items and clear preview.\n"
+            "4) Click 'Export CSV' to save grouped Method+URL CSV.\n"
             "   - Numeric/UUID path segments replaced with {id} placeholders."
         )
         JOptionPane.showMessageDialog(None, help_text)
@@ -257,7 +254,6 @@ class BurpExtender(IBurpExtender, ITab):
             self.preview.setText("No endpoints found.")
             return
 
-        # Build grouped structure for preview
         grouped = {}
         total_count = 0
         for entry in entries:
@@ -272,14 +268,12 @@ class BurpExtender(IBurpExtender, ITab):
                     method = "GET"
                 except:
                     continue
-
             host = url.split("/",3)[2] if "://" in url else "unknown_host"
             normalized = normalize_path_for_placeholders(url)
             segs = [s for s in normalized.split("/") if s]
             top_folder = segs[0] if segs else "/"
             grouped.setdefault(host, {}).setdefault(top_folder, []).append((method, normalized))
 
-        # Build preview text
         preview_lines = []
         for host, folders in sorted(grouped.items()):
             preview_lines.append("Host: %s" % host)
@@ -301,7 +295,6 @@ class BurpExtender(IBurpExtender, ITab):
         path = choose_file("apihero_export.csv")
         if not path: return
 
-        # Build grouped structure
         grouped = {}
         for entry in entries:
             try:
@@ -315,14 +308,12 @@ class BurpExtender(IBurpExtender, ITab):
                     method = "GET"
                 except:
                     continue
-
             host = url.split("/",3)[2] if "://" in url else "unknown_host"
             normalized = normalize_path_for_placeholders(url)
             segs = [s for s in normalized.split("/") if s]
             top_folder = segs[0] if segs else "/"
             grouped.setdefault(host, {}).setdefault(top_folder, []).append((method, normalized))
 
-        # Write CSV following grouped order
         try:
             with open(path, "w") as f:
                 f.write("Host,Top-Level Folder,Method,Endpoint\n")
@@ -334,3 +325,11 @@ class BurpExtender(IBurpExtender, ITab):
         except Exception:
             self._err("CSV export failed:\n" + traceback.format_exc())
             JOptionPane.showMessageDialog(None,"CSV export failed: see stderr.")
+
+    # ---------------- Clear Selection ----------------
+    def _on_clear_selection(self, evt):
+        try:
+            self.tree.clearSelection()
+            self.preview.setText("Selection cleared.")
+        except Exception:
+            self._err("Failed to clear selection:\n" + traceback.format_exc())
