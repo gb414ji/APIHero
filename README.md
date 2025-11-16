@@ -21,6 +21,8 @@
 - Fully compatible with **Jython 2.7** for Burp Suite.
 - Minimalist, lightweight UI for fast performance.
 
+- **Version 1.1** have clear selection feature!!!
+
 ---
 
 ## Screenshots
