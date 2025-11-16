@@ -1,6 +1,6 @@
 # APIHero - Burp Suite Extension for CSV Endpoint Export
 
-<img width="1024" height="1024" alt="Gemini_Generated_Image_h71tm4h71tm4h71t" src="https://github.com/user-attachments/assets/e2e18b3d-6aa7-4b5e-b176-63c8b233efc3" />
+<img width="1024" height="1024" alt="apihero" src="https://github.com/user-attachments/assets/5a566027-80d8-491a-8313-1535d53db95c" />
 
 
 **APIHero** is a lightweight Burp Suite extension for extracting and exporting API endpoints from your site's sitemap. It focuses on simplicity, usability, and CSV export. Numeric or UUID path segments are automatically replaced with `{id}` placeholders for better reusability.
